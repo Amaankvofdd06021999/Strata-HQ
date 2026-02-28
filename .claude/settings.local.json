@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run dev)",
+      "Bash(npm install)",
+      "Bash(for dir in dashboard maintenance violations tasks documents polls amenities community directory meetings shareholder reports settings bylaws manager-forum)",
+      "Bash(do mv \"$dir\" \"(protected)/\")",
+      "Bash(echo \"Skipped $dir\")",
+      "Bash(done)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :3000)",
+      "Bash(Get-ChildItem -Path app -Recurse -Filter \"page.tsx\")",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(git init)",
+      "Bash(git add .)",
+      "Bash(git config --global --add safe.directory 'D:/F Drive/work/Works/Future/strataHD/StrataHQ-App')"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
