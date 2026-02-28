@@ -277,8 +277,6 @@ export default function MeetingDetailPage() {
           </Card>
         </div>
       </div>
-    </div>
-      </div>
     </ProtectedLayout>
   )
 }
