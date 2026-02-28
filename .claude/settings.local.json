@@ -13,7 +13,20 @@
       "Bash(Select-Object -ExpandProperty FullName)",
       "Bash(git init)",
       "Bash(git add .)",
-      "Bash(git config --global --add safe.directory 'D:/F Drive/work/Works/Future/strataHD/StrataHQ-App')"
+      "Bash(git config --global --add safe.directory 'D:/F Drive/work/Works/Future/strataHD/StrataHQ-App')",
+      "Bash(git commit -m \"$(cat <<''EOF''\nInitial commit: Complete Strata Management Platform\n\n- Implemented full Maintenance Kanban board (Submitted, Under Review, Approved, In Progress)\n- Implemented full Tasks Kanban board (TODO, IN PROGRESS, REVIEW, COMPLETED)\n- Completed Violations management system with stats and workflow\n- Completed Documents library with role-based access control\n- Completed interactive Polls & Voting system\n- Added comprehensive filtering, search, and role-based permissions\n- Integrated shadcn/ui components and Next.js 16 with Turbopack\n- Set up responsive layouts and protected routes\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git remote add origin https://github.com/Amaankvofdd06021999/Strata-HQ.git)",
+      "Bash(git branch -M main)",
+      "Bash(git push -u origin main)",
+      "Bash(git add app/meetings/[id]/page.tsx)",
+      "Bash(git commit -m \"Fix: Remove extra closing div tag in meetings detail page\")",
+      "Bash(git push origin main)",
+      "Bash(git commit -m \"Fix: Correct div indentation and nesting in meetings detail page\")",
+      "Bash(git add lib/utils-extended.ts)",
+      "Bash(git commit -m \"Add formatTime function to utils-extended\")",
+      "Bash(git add app/tasks/page.tsx)",
+      "Bash(git commit -m \"Feat: Rebuild Tasks with Eisenhower Matrix and comment system\n\n- Implemented 4-quadrant Eisenhower Matrix (Urgent/Important prioritization)\n- Added task detail modal with full information\n- Added commenting system for task collaboration\n- Added assigned user avatars and progress tracking\n- Added subtask display and completion status\n- Improved task categorization and filtering\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\")",
+      "Bash(git commit -m \"Feat: Complete Amenities booking system with full workflow\n\n- Implemented amenity browsing with search and filtering\n- Added booking dialog with date/time selection  \n- Built my bookings view (upcoming and past)\n- Added booking management (modify, cancel)\n- Integrated stats dashboard\n- Full amenity details with capacity, rates, features\n- Role-based booking permissions\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\")"
     ],
     "deny": [],
     "ask": []
