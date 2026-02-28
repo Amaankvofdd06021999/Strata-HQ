@@ -3,119 +3,285 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { ProtectedLayout } from '@/components/protected-layout';
-import { Plus, Search, CheckSquare, Clock, User, LayoutGrid, List, Calendar } from 'lucide-react';
+import { Plus, Search, CheckSquare, MessageSquare, User, Calendar, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { mockTasks } from '@/lib/mock-data';
-import { formatDate, getPriorityColor } from '@/lib/utils-extended';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { mockTasks, mockUsers } from '@/lib/mock-data';
+import { formatDate, getPriorityColor, getInitials } from '@/lib/utils-extended';
 import { useAuth } from '@/lib/auth-context';
-import type { TaskStatus, Priority } from '@/lib/types';
+
+type MatrixQuadrant = 'urgent-important' | 'not-urgent-important' | 'urgent-not-important' | 'not-urgent-not-important';
 
 export default function TasksPage() {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
-  const [priorityFilter, setPriorityFilter] = useState<Priority | 'all'>('all');
-  const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
+  const [selectedTask, setSelectedTask] = useState<typeof mockTasks[0] | null>(null);
+  const [newComment, setNewComment] = useState('');
 
   const isCouncilOrManager = user?.role === 'council_member' || user?.role === 'property_manager' || user?.role === 'admin';
+
+  // Categorize tasks into Eisenhower Matrix quadrants
+  const categorizeTask = (task: typeof mockTasks[0]): MatrixQuadrant => {
+    const isUrgent = task.priority === 'urgent' || task.priority === 'high';
+    const isImportant = task.category === 'Financial' || task.category === 'Legal & Compliance' || task.category === 'Safety & Security';
+
+    if (isUrgent && isImportant) return 'urgent-important';
+    if (!isUrgent && isImportant) return 'not-urgent-important';
+    if (isUrgent && !isImportant) return 'urgent-not-important';
+    return 'not-urgent-not-important';
+  };
 
   // Filter tasks
   const filteredTasks = mockTasks.filter((task) => {
     const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          task.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter;
 
-    // Only council/managers can see all tasks
     if (!isCouncilOrManager) {
-      return matchesSearch && matchesPriority && task.assignedTo.includes(user?.id || '');
+      return matchesSearch && task.assignedTo.includes(user?.id || '');
     }
-
-    return matchesSearch && matchesPriority;
+    return matchesSearch;
   });
 
-  // Group by status for Kanban
-  const todoTasks = filteredTasks.filter(t => t.status === 'todo');
-  const inProgressTasks = filteredTasks.filter(t => t.status === 'inprogress');
-  const reviewTasks = filteredTasks.filter(t => t.status === 'review');
-  const completedTasks = filteredTasks.filter(t => t.status === 'completed');
+  // Group by quadrant
+  const urgentImportant = filteredTasks.filter(t => categorizeTask(t) === 'urgent-important');
+  const notUrgentImportant = filteredTasks.filter(t => categorizeTask(t) === 'not-urgent-important');
+  const urgentNotImportant = filteredTasks.filter(t => categorizeTask(t) === 'urgent-not-important');
+  const notUrgentNotImportant = filteredTasks.filter(t => categorizeTask(t) === 'not-urgent-not-important');
 
-  const getStatusColor = (status: TaskStatus) => {
-    switch (status) {
-      case 'todo': return 'bg-slate-100 text-slate-800 border-slate-300';
-      case 'inprogress': return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'review': return 'bg-amber-100 text-amber-800 border-amber-300';
-      case 'completed': return 'bg-green-100 text-green-800 border-green-300';
-      default: return 'bg-gray-100 text-gray-800';
+  const handleAddComment = () => {
+    if (newComment.trim() && selectedTask) {
+      // In a real app, this would call an API
+      console.log('Adding comment:', newComment, 'to task:', selectedTask.id);
+      setNewComment('');
     }
   };
 
-  const getStatusLabel = (status: TaskStatus) => {
-    switch (status) {
-      case 'todo': return 'To Do';
-      case 'inprogress': return 'In Progress';
-      case 'review': return 'Review';
-      case 'completed': return 'Completed';
-      case 'blocked': return 'Blocked';
-      default: return status;
-    }
-  };
+  const TaskCard = ({ task }: { task: typeof mockTasks[0] }) => {
+    const assignedUsers = task.assignedTo.map(id => mockUsers.find(u => u.id === id)).filter(Boolean);
 
-  const TaskCard = ({ task }: { task: typeof mockTasks[0] }) => (
-    <Card className="hover:shadow-md transition-shadow cursor-pointer">
-      <CardContent className="p-4">
-        <div className="space-y-3">
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="font-semibold leading-tight flex-1">{task.title}</h3>
-            <Badge variant="outline" className={getPriorityColor(task.priority)}>
-              {task.priority}
-            </Badge>
-          </div>
+    return (
+      <Dialog>
+        <DialogTrigger asChild>
+          <Card className="hover:shadow-lg transition-all cursor-pointer border-l-4"
+                style={{ borderLeftColor: task.priority === 'urgent' ? '#ef4444' : task.priority === 'high' ? '#f59e0b' : '#3b82f6' }}
+                onClick={() => setSelectedTask(task)}>
+            <CardContent className="p-4">
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="font-semibold leading-tight flex-1 text-sm">{task.title}</h3>
+                  <Badge variant="outline" className={`${getPriorityColor(task.priority)} text-xs`}>
+                    {task.priority}
+                  </Badge>
+                </div>
 
-          <p className="text-sm text-muted-foreground line-clamp-2">
-            {task.description}
-          </p>
+                <p className="text-xs text-muted-foreground line-clamp-2">
+                  {task.description}
+                </p>
 
-          {task.progress !== undefined && (
-            <div className="space-y-1">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Progress</span>
-                <span>{task.progress}%</span>
+                {task.progress !== undefined && (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>Progress</span>
+                      <span>{task.progress}%</span>
+                    </div>
+                    <Progress value={task.progress} className="h-1.5" />
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-2 border-t">
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Calendar className="h-3 w-3" />
+                    <span>{formatDate(task.dueDate, 'MMM dd')}</span>
+                  </div>
+                  <div className="flex -space-x-2">
+                    {assignedUsers.slice(0, 3).map((u) => u && (
+                      <Avatar key={u.id} className="h-6 w-6 border-2 border-background">
+                        <AvatarFallback className="text-xs">{getInitials(u.name)}</AvatarFallback>
+                      </Avatar>
+                    ))}
+                    {assignedUsers.length > 3 && (
+                      <div className="h-6 w-6 rounded-full bg-muted border-2 border-background flex items-center justify-center text-xs">
+                        +{assignedUsers.length - 3}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  {task.subtasks && task.subtasks.length > 0 && (
+                    <div className="flex items-center gap-1">
+                      <CheckSquare className="h-3 w-3" />
+                      <span>{task.subtasks.filter(st => st.completed).length}/{task.subtasks.length}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1">
+                    <MessageSquare className="h-3 w-3" />
+                    <span>0</span>
+                  </div>
+                </div>
               </div>
-              <Progress value={task.progress} className="h-2" />
-            </div>
-          )}
+            </CardContent>
+          </Card>
+        </DialogTrigger>
 
-          <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
-            <div className="flex items-center gap-1">
-              <Calendar className="h-3 w-3" />
-              <span>Due {formatDate(task.dueDate)}</span>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">{task.title}</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            {/* Task Details */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <Badge variant="outline" className={getPriorityColor(task.priority)}>
+                  {task.priority}
+                </Badge>
+                <Badge variant="secondary">{task.category}</Badge>
+                <Badge>{task.status}</Badge>
+              </div>
+
+              <p className="text-muted-foreground">{task.description}</p>
+
+              <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                <div>
+                  <div className="text-sm font-medium mb-1">Due Date</div>
+                  <div className="text-sm text-muted-foreground">{formatDate(task.dueDate)}</div>
+                </div>
+                <div>
+                  <div className="text-sm font-medium mb-1">Created</div>
+                  <div className="text-sm text-muted-foreground">{formatDate(task.createdDate)}</div>
+                </div>
+              </div>
+
+              {task.progress !== undefined && (
+                <div>
+                  <div className="text-sm font-medium mb-2">Progress: {task.progress}%</div>
+                  <Progress value={task.progress} className="h-2" />
+                </div>
+              )}
+
+              <div>
+                <div className="text-sm font-medium mb-2">Assigned To</div>
+                <div className="flex flex-wrap gap-2">
+                  {assignedUsers.map((u) => u && (
+                    <div key={u.id} className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-full">
+                      <Avatar className="h-6 w-6">
+                        <AvatarFallback className="text-xs">{getInitials(u.name)}</AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm">{u.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
-            <Badge variant="secondary" className="text-xs">
-              {task.category}
-            </Badge>
+
+            {/* Subtasks */}
+            {task.subtasks && task.subtasks.length > 0 && (
+              <div className="border-t pt-4">
+                <h3 className="font-semibold mb-3">Subtasks</h3>
+                <div className="space-y-2">
+                  {task.subtasks.map((subtask) => (
+                    <div key={subtask.id} className="flex items-center gap-2 p-2 hover:bg-muted rounded">
+                      <input
+                        type="checkbox"
+                        checked={subtask.completed}
+                        className="rounded"
+                        readOnly
+                      />
+                      <span className={subtask.completed ? 'line-through text-muted-foreground' : ''}>
+                        {subtask.title}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Comments Section */}
+            <div className="border-t pt-4">
+              <h3 className="font-semibold mb-4">Activity & Comments</h3>
+
+              <div className="space-y-4 mb-4">
+                <div className="flex gap-3">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback>{getInitials(user?.name || 'User')}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 space-y-2">
+                    <Textarea
+                      placeholder="Add a comment..."
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      rows={3}
+                    />
+                    <Button onClick={handleAddComment} size="sm">
+                      Add Comment
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Mock Comments */}
+                <div className="space-y-4">
+                  <div className="flex gap-3">
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback>SC</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <div className="bg-muted rounded-lg p-3">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-sm">Sarah Chen</span>
+                          <span className="text-xs text-muted-foreground">2 hours ago</span>
+                        </div>
+                        <p className="text-sm">I've started working on this task. Will update progress by EOD.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
+        </DialogContent>
+      </Dialog>
+    );
+  };
 
-          {task.subtasks && task.subtasks.length > 0 && (
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <CheckSquare className="h-3 w-3" />
-              <span>
-                {task.subtasks.filter(st => st.completed).length}/{task.subtasks.length} subtasks
-              </span>
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+  const QuadrantCard = ({
+    title,
+    description,
+    tasks,
+    color,
+    textColor
+  }: {
+    title: string;
+    description: string;
+    tasks: typeof mockTasks;
+    color: string;
+    textColor: string;
+  }) => (
+    <div className="space-y-3">
+      <div className={`p-4 rounded-lg ${color}`}>
+        <h3 className={`font-bold text-lg ${textColor}`}>{title}</h3>
+        <p className={`text-sm ${textColor} opacity-90`}>{description}</p>
+        <Badge variant="secondary" className="mt-2">{tasks.length} tasks</Badge>
+      </div>
+      <div className="space-y-3 min-h-[300px]">
+        {tasks.map((task) => (
+          <TaskCard key={task.id} task={task} />
+        ))}
+        {tasks.length === 0 && (
+          <Card className="border-dashed">
+            <CardContent className="p-8 text-center text-sm text-muted-foreground">
+              No tasks in this quadrant
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </div>
   );
 
   return (
@@ -126,225 +292,73 @@ export default function TasksPage() {
           <div>
             <h1 className="text-3xl lg:text-4xl font-bold flex items-center gap-3">
               <CheckSquare className="h-8 w-8" />
-              Tasks
+              Task Management
             </h1>
             <p className="text-muted-foreground mt-1 text-lg">
-              Manage your tasks and action items
+              Eisenhower Matrix - Prioritize what matters most
             </p>
           </div>
-          <div className="flex gap-2">
-            <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
-              <Button
-                variant={viewMode === 'kanban' ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('kanban')}
-                className="gap-2"
-              >
-                <LayoutGrid className="h-4 w-4" />
-                Board
-              </Button>
-              <Button
-                variant={viewMode === 'list' ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('list')}
-                className="gap-2"
-              >
-                <List className="h-4 w-4" />
-                List
-              </Button>
-            </div>
-            {isCouncilOrManager && (
-              <Button size="lg">
-                <Plus className="mr-2 h-5 w-5" />
-                New Task
-              </Button>
-            )}
-          </div>
+          {isCouncilOrManager && (
+            <Button size="lg">
+              <Plus className="mr-2 h-5 w-5" />
+              New Task
+            </Button>
+          )}
         </div>
 
-        {/* Filters */}
+        {/* Search */}
         <Card>
           <CardContent className="p-4">
-            <div className="grid gap-4 md:grid-cols-[1fr,200px]">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search tasks..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 h-11"
-                />
-              </div>
-              <Select value={priorityFilter} onValueChange={(value) => setPriorityFilter(value as Priority | 'all')}>
-                <SelectTrigger className="h-11">
-                  <SelectValue placeholder="All Priorities" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Priorities</SelectItem>
-                  <SelectItem value="urgent">Urgent</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search tasks..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-11"
+              />
             </div>
           </CardContent>
         </Card>
 
-        {/* Kanban Board View */}
-        {viewMode === 'kanban' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* TODO Column */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border-2 border-slate-200">
-                <h3 className="font-semibold text-slate-800">TODO</h3>
-                <Badge variant="secondary" className="bg-slate-200">{todoTasks.length}</Badge>
-              </div>
-              <div className="space-y-3 min-h-[200px]">
-                {todoTasks.map((task) => (
-                  <TaskCard key={task.id} task={task} />
-                ))}
-                {todoTasks.length === 0 && (
-                  <Card className="border-dashed">
-                    <CardContent className="p-8 text-center text-sm text-muted-foreground">
-                      No tasks to do
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            </div>
+        {/* Eisenhower Matrix - 2x2 Grid */}
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* Q1: Urgent & Important - DO FIRST */}
+          <QuadrantCard
+            title="🔥 DO FIRST"
+            description="Urgent & Important - Crisis, Deadlines"
+            tasks={urgentImportant}
+            color="bg-red-50 border-2 border-red-200"
+            textColor="text-red-900"
+          />
 
-            {/* IN PROGRESS Column */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
-                <h3 className="font-semibold text-blue-800">IN PROGRESS</h3>
-                <Badge variant="secondary" className="bg-blue-200">{inProgressTasks.length}</Badge>
-              </div>
-              <div className="space-y-3 min-h-[200px]">
-                {inProgressTasks.map((task) => (
-                  <TaskCard key={task.id} task={task} />
-                ))}
-                {inProgressTasks.length === 0 && (
-                  <Card className="border-dashed">
-                    <CardContent className="p-8 text-center text-sm text-muted-foreground">
-                      No tasks in progress
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            </div>
+          {/* Q2: Not Urgent & Important - SCHEDULE */}
+          <QuadrantCard
+            title="📅 SCHEDULE"
+            description="Not Urgent & Important - Planning, Development"
+            tasks={notUrgentImportant}
+            color="bg-green-50 border-2 border-green-200"
+            textColor="text-green-900"
+          />
 
-            {/* REVIEW Column */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-4 bg-amber-50 rounded-lg border-2 border-amber-200">
-                <h3 className="font-semibold text-amber-800">REVIEW</h3>
-                <Badge variant="secondary" className="bg-amber-200">{reviewTasks.length}</Badge>
-              </div>
-              <div className="space-y-3 min-h-[200px]">
-                {reviewTasks.map((task) => (
-                  <TaskCard key={task.id} task={task} />
-                ))}
-                {reviewTasks.length === 0 && (
-                  <Card className="border-dashed">
-                    <CardContent className="p-8 text-center text-sm text-muted-foreground">
-                      No tasks in review
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            </div>
+          {/* Q3: Urgent & Not Important - DELEGATE */}
+          <QuadrantCard
+            title="👥 DELEGATE"
+            description="Urgent & Not Important - Interruptions"
+            tasks={urgentNotImportant}
+            color="bg-amber-50 border-2 border-amber-200"
+            textColor="text-amber-900"
+          />
 
-            {/* COMPLETED Column */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg border-2 border-green-200">
-                <h3 className="font-semibold text-green-800">COMPLETED</h3>
-                <Badge variant="secondary" className="bg-green-200">{completedTasks.length}</Badge>
-              </div>
-              <div className="space-y-3 min-h-[200px]">
-                {completedTasks.map((task) => (
-                  <TaskCard key={task.id} task={task} />
-                ))}
-                {completedTasks.length === 0 && (
-                  <Card className="border-dashed">
-                    <CardContent className="p-8 text-center text-sm text-muted-foreground">
-                      No completed tasks
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* List View */}
-        {viewMode === 'list' && (
-          <div className="space-y-4">
-            {filteredTasks.length === 0 ? (
-              <Card>
-                <CardContent className="p-12 text-center">
-                  <CheckSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No tasks found</h3>
-                  <p className="text-muted-foreground mb-4">Try adjusting your filters</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-3">
-                {filteredTasks.map((task) => (
-                  <Card key={task.id} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-5">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 space-y-3">
-                          <div className="flex items-start gap-3">
-                            <div className="flex-1">
-                              <h3 className="font-semibold text-lg mb-1">{task.title}</h3>
-                              <p className="text-sm text-muted-foreground">{task.description}</p>
-                            </div>
-                            <div className="flex flex-col gap-2 items-end">
-                              <Badge variant="outline" className={getPriorityColor(task.priority)}>
-                                {task.priority}
-                              </Badge>
-                              <Badge variant="secondary" className={getStatusColor(task.status)}>
-                                {getStatusLabel(task.status)}
-                              </Badge>
-                            </div>
-                          </div>
-
-                          {task.progress !== undefined && (
-                            <div className="space-y-1">
-                              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                <span>Progress</span>
-                                <span>{task.progress}%</span>
-                              </div>
-                              <Progress value={task.progress} className="h-2" />
-                            </div>
-                          )}
-
-                          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                            <div className="flex items-center gap-1.5">
-                              <Calendar className="h-4 w-4" />
-                              <span>Due {formatDate(task.dueDate)}</span>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                              <span>{task.category}</span>
-                            </div>
-                            {task.subtasks && task.subtasks.length > 0 && (
-                              <div className="flex items-center gap-1.5">
-                                <CheckSquare className="h-4 w-4" />
-                                <span>
-                                  {task.subtasks.filter(st => st.completed).length}/{task.subtasks.length} subtasks
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+          {/* Q4: Not Urgent & Not Important - ELIMINATE */}
+          <QuadrantCard
+            title="🗑️ ELIMINATE"
+            description="Not Urgent & Not Important - Time Wasters"
+            tasks={notUrgentNotImportant}
+            color="bg-slate-50 border-2 border-slate-200"
+            textColor="text-slate-900"
+          />
+        </div>
       </div>
     </ProtectedLayout>
   );
